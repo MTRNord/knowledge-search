@@ -149,7 +149,7 @@ impl IndexerBot {
 
     // FIXME:_split into multiple functions
     #[allow(clippy::too_many_lines)]
-    pub async fn start_processing(&mut self) {
+    pub async fn start_processing(&mut self) -> Result<()> {
         let mut inserter = BulkInserter::new(self.indexer_client.clone());
 
         let mut sync_stream = Box::pin(self.client.sync_stream(SyncSettings::default()).await);
@@ -236,14 +236,14 @@ impl IndexerBot {
                     .push(utils::indradb::BulkInsertItem::Vertex(
                         utils::indradb::Vertex::with_id(*uuid, self.identifiers.room_type),
                     ))
-                    .await;
+                    .await?;
                 inserter
                     .push(utils::indradb::BulkInsertItem::VertexProperty(
                         *uuid,
                         self.identifiers.room_id_type,
                         serde_json::Value::String(room_id.to_string()).into(),
                     ))
-                    .await;
+                    .await?;
                 if let Some(room_name) = &room_properties.name {
                     inserter
                         .push(utils::indradb::BulkInsertItem::VertexProperty(
@@ -251,7 +251,7 @@ impl IndexerBot {
                             self.identifiers.room_name_type,
                             serde_json::Value::String(room_name.to_string()).into(),
                         ))
-                        .await;
+                        .await?;
                 }
                 if let Some(room_topic) = &room_properties.topic {
                     inserter
@@ -260,7 +260,7 @@ impl IndexerBot {
                             self.identifiers.room_topic_type,
                             serde_json::Value::String(room_topic.to_string()).into(),
                         ))
-                        .await;
+                        .await?;
                 }
             }
             for UUIDEventMapType {
@@ -274,19 +274,19 @@ impl IndexerBot {
                     .push(utils::indradb::BulkInsertItem::Vertex(
                         utils::indradb::Vertex::with_id(*uuid, *event_type),
                     ))
-                    .await;
+                    .await?;
                 inserter
                     .push(utils::indradb::BulkInsertItem::VertexProperty(
                         *uuid,
                         self.identifiers.event_id_type,
                         serde_json::Value::String(event_id.to_string()).into(),
                     ))
-                    .await;
+                    .await?;
                 for event_property in event_properties
                     .as_vec(*uuid)
                     .expect("Unable to convert to indradb properties")
                 {
-                    inserter.push(event_property).await;
+                    inserter.push(event_property).await?;
                 }
             }
 
@@ -299,9 +299,10 @@ impl IndexerBot {
                             *room_uuid,
                         ),
                     ))
-                    .await;
+                    .await?;
             }
-            inserter.sync().await.expect("Unable to sync indradb");
+            inserter.sync().await?;
         }
+        Ok(())
     }
 }

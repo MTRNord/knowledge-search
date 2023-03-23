@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
 
     // TODO: config which rewrites itself to have the data after login
     let mut bot = IndexerBot::new(String::new(), String::new(), String::new()).await?;
-    bot.start_processing().await;
+    bot.start_processing().await?;
 
     Ok(())
 }

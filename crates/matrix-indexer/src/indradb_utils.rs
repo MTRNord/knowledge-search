@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     mem::replace,
 };
 
@@ -21,7 +21,7 @@ lazy_static! {
 
 pub struct BulkInserter {
     requests: async_channel::Sender<Vec<indradb::BulkInsertItem>>,
-    workers: Vec<JoinHandle<()>>,
+    workers: Vec<JoinHandle<Result<()>>>,
     buf: Vec<indradb::BulkInsertItem>,
     client: proto::Client,
 }
@@ -36,8 +36,9 @@ impl BulkInserter {
             let mut client = client.clone();
             workers.push(tokio::spawn(async move {
                 while let Ok(buf) = rx.recv().await {
-                    client.bulk_insert(buf).await.unwrap();
+                    client.bulk_insert(buf).await?;
                 }
+                Ok(())
             }));
         }
 
@@ -54,23 +55,25 @@ impl BulkInserter {
         Ok(())
     }
 
-    pub async fn flush(mut self) {
+    pub async fn flush(mut self) -> Result<()> {
         if !self.buf.is_empty() {
-            self.requests.send(self.buf).await.unwrap();
+            self.requests.send(self.buf).await?;
         }
         self.requests.close();
         for worker in self.workers {
-            worker.await.unwrap();
+            worker.await??;
         }
-        self.client.sync().await.unwrap();
+        self.client.sync().await?;
+        Ok(())
     }
 
-    pub async fn push(&mut self, item: indradb::BulkInsertItem) {
+    pub async fn push(&mut self, item: indradb::BulkInsertItem) -> Result<()> {
         self.buf.push(item);
         if self.buf.len() >= REQUEST_BUFFER_SIZE {
             let buf = replace(&mut self.buf, Vec::with_capacity(REQUEST_BUFFER_SIZE));
-            self.requests.send(buf).await.unwrap();
+            self.requests.send(buf).await?;
         }
+        Ok(())
     }
 }
 
@@ -106,11 +109,11 @@ pub type EventUuid = Uuid;
 // TODO: Track all the properties!
 #[derive(Default)]
 pub struct MessagesMap {
-    event_uuids: HashMap<OwnedEventId, EventUuid>,
+    event_uuids: BTreeMap<OwnedEventId, EventUuid>,
     pub message_list: VecDeque<UUIDEventMapType>,
-    room_uuids: HashMap<OwnedRoomId, RoomUuid>,
+    room_uuids: BTreeMap<OwnedRoomId, RoomUuid>,
     pub room_list: VecDeque<UUIDRoomMapType>,
-    pub room_event_links: HashMap<EventUuid, RoomUuid>,
+    pub room_event_links: BTreeMap<EventUuid, RoomUuid>,
 }
 
 impl EventProperties {
