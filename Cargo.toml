@@ -1,0 +1,2 @@
+[workspace]
+members = ["crates/knowledge-search", "crates/matrix-indexer", "crates/utils"]

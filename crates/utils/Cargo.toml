@@ -1,0 +1,11 @@
+[package]
+name = "utils"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+indradb-lib = { version = "4.0.0", default_features = false }
+indradb-proto = "4.0.0"
+tokio = { version = "1.26.0", features = ["time"] }
