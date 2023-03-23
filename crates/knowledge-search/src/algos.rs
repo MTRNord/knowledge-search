@@ -16,7 +16,10 @@ impl PageRank {
 
         let rank = 1.0 / node_count;
 
-        let ranks = HashMap::from_iter(graph.keys().map(|k| (k.to_owned(), rank)));
+        let ranks = graph
+            .keys()
+            .map(|k| (k.clone(), rank))
+            .collect::<HashMap<_, _>>();
 
         PageRank {
             graph,
@@ -35,7 +38,7 @@ impl PageRank {
 
             let dangling_nodes_sum = self.compute_dangling_nodes_sum();
 
-            for (node_id, neighbors) in self.graph.iter() {
+            for (node_id, neighbors) in &self.graph {
                 let mut rank = (1.0 - self.damping_factor) / self.graph.len() as f32;
 
                 for neighbor_id in neighbors.iter() {
@@ -50,7 +53,7 @@ impl PageRank {
             }
 
             let mut max_error = 0.0;
-            for (node_id, rank) in new_ranks.iter() {
+            for (node_id, rank) in &new_ranks {
                 let old_rank = self.ranks.get(node_id).unwrap_or(&0.0);
                 let error = (rank - old_rank).abs();
 
@@ -67,7 +70,7 @@ impl PageRank {
     fn compute_dangling_nodes_sum(&self) -> f32 {
         let mut sum = 0.0;
 
-        for (node_id, neighbors) in self.graph.iter() {
+        for (node_id, neighbors) in &self.graph {
             if neighbors.is_empty() {
                 sum += self.ranks.get(node_id).unwrap_or(&0.0);
             }
