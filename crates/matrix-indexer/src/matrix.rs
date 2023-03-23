@@ -16,10 +16,7 @@ use matrix_sdk::{
 };
 use tracing::{error, info};
 
-pub struct IndexerBot {
-    client: Client,
-    indexer_client: utils::indradb_proto::Client,
-    message_map: MessagesMap,
+struct Identifiers {
     room_type: utils::indradb::Identifier,
     room_id_type: utils::indradb::Identifier,
     room_name_type: utils::indradb::Identifier,
@@ -27,6 +24,13 @@ pub struct IndexerBot {
     text_message_event_type: utils::indradb::Identifier,
     notice_message_event_type: utils::indradb::Identifier,
     event_id_type: utils::indradb::Identifier,
+}
+
+pub struct IndexerBot {
+    client: Client,
+    indexer_client: utils::indradb_proto::Client,
+    message_map: MessagesMap,
+    identifiers: Identifiers,
 }
 
 impl IndexerBot {
@@ -37,6 +41,47 @@ impl IndexerBot {
         Ok(client_builder.build().await?)
     }
 
+    async fn get_indexer_client() -> Result<(utils::indradb_proto::Client, Identifiers)> {
+        info!("Trying to connect to indradb");
+        let mut indexer_client = utils::get_client_retrying().await?;
+        indexer_client.ping().await?;
+        let room_type = utils::indradb::Identifier::new("matrix_room")?;
+        let room_id_type = utils::indradb::Identifier::new("room_id")?;
+        let room_name_type = utils::indradb::Identifier::new("room_name")?;
+        let room_topic_type = utils::indradb::Identifier::new("room_topic")?;
+        let text_message_event_type = utils::indradb::Identifier::new("text_message_event")?;
+        let notice_message_event_type = utils::indradb::Identifier::new("notice_message_event")?;
+        let event_id_type = utils::indradb::Identifier::new("event_id")?;
+        indexer_client.index_property(room_name_type).await?;
+        indexer_client.index_property(room_topic_type).await?;
+        indexer_client.index_property(event_id_type).await?;
+        indexer_client
+            .index_property(utils::indradb::Identifier::new("text_message_body")?)
+            .await?;
+        indexer_client
+            .index_property(utils::indradb::Identifier::new("text_message_format")?)
+            .await?;
+        indexer_client
+            .index_property(utils::indradb::Identifier::new(
+                "text_message_formatted_body",
+            )?)
+            .await?;
+        info!("Connected to indradb");
+
+        Ok((
+            indexer_client,
+            Identifiers {
+                room_type,
+                room_id_type,
+                room_name_type,
+                room_topic_type,
+                text_message_event_type,
+                notice_message_event_type,
+                event_id_type,
+            },
+        ))
+    }
+
     pub async fn new(homeserver_url: String, user_id: String, password: String) -> Result<Self> {
         let client = IndexerBot::get_client(homeserver_url).await?;
         client
@@ -45,22 +90,19 @@ impl IndexerBot {
             .send()
             .await?;
 
-        info!("Trying to connect to indradb");
-        let mut indexer_client = utils::get_client_retrying().await?;
-        indexer_client.ping().await?;
-        info!("Connected to indradb");
+        let (indexer_client, identifiers) = IndexerBot::get_indexer_client().await?;
+
+        let client_clone = client.clone();
+        tokio::spawn(async move {
+            let settings = SyncSettings::default();
+            client_clone.sync(settings).await.unwrap();
+        });
 
         Ok(IndexerBot {
             client,
             indexer_client,
             message_map: MessagesMap::default(),
-            room_type: utils::indradb::Identifier::new("matrix_room")?,
-            room_id_type: utils::indradb::Identifier::new("room_id")?,
-            room_name_type: utils::indradb::Identifier::new("room_name")?,
-            room_topic_type: utils::indradb::Identifier::new("room_topic")?,
-            text_message_event_type: utils::indradb::Identifier::new("text_message_event")?,
-            notice_message_event_type: utils::indradb::Identifier::new("notice_message_event")?,
-            event_id_type: utils::indradb::Identifier::new("event_id")?,
+            identifiers,
         })
     }
 
@@ -80,10 +122,7 @@ impl IndexerBot {
             })
             .await?;
 
-        info!("Trying to connect to indradb");
-        let mut indexer_client = utils::get_client_retrying().await?;
-        indexer_client.ping().await?;
-        info!("Connected to indradb");
+        let (indexer_client, identifiers) = IndexerBot::get_indexer_client().await?;
 
         let client_clone = client.clone();
         tokio::spawn(async move {
@@ -95,13 +134,7 @@ impl IndexerBot {
             client,
             indexer_client,
             message_map: MessagesMap::default(),
-            room_type: utils::indradb::Identifier::new("matrix_room")?,
-            room_id_type: utils::indradb::Identifier::new("room_id")?,
-            room_name_type: utils::indradb::Identifier::new("room_name")?,
-            room_topic_type: utils::indradb::Identifier::new("room_topic")?,
-            text_message_event_type: utils::indradb::Identifier::new("text_message_event")?,
-            notice_message_event_type: utils::indradb::Identifier::new("notice_message_event")?,
-            event_id_type: utils::indradb::Identifier::new("event_id")?,
+            identifiers,
         })
     }
 
@@ -141,7 +174,7 @@ impl IndexerBot {
                                         self.message_map.insert_event(
                                             message.event_id,
                                             room_uuid,
-                                            self.text_message_event_type,
+                                            self.identifiers.text_message_event_type,
                                             crate::indradb_utils::EventProperties::TextMessage(
                                                 message_content.body,
                                                 message_content
@@ -156,7 +189,7 @@ impl IndexerBot {
                                         self.message_map.insert_event(
                                             message.event_id,
                                             room_uuid,
-                                            self.notice_message_event_type,
+                                            self.identifiers.notice_message_event_type,
                                             crate::indradb_utils::EventProperties::TextMessage(
                                                 message_content.body,
                                                 message_content
@@ -189,13 +222,13 @@ impl IndexerBot {
             {
                 inserter
                     .push(utils::indradb::BulkInsertItem::Vertex(
-                        utils::indradb::Vertex::with_id(*uuid, self.room_type),
+                        utils::indradb::Vertex::with_id(*uuid, self.identifiers.room_type),
                     ))
                     .await;
                 inserter
                     .push(utils::indradb::BulkInsertItem::VertexProperty(
                         *uuid,
-                        self.room_id_type,
+                        self.identifiers.room_id_type,
                         serde_json::Value::String(room_id.to_string()).into(),
                     ))
                     .await;
@@ -203,7 +236,7 @@ impl IndexerBot {
                     inserter
                         .push(utils::indradb::BulkInsertItem::VertexProperty(
                             *uuid,
-                            self.room_name_type,
+                            self.identifiers.room_name_type,
                             serde_json::Value::String(room_name.to_string()).into(),
                         ))
                         .await;
@@ -212,7 +245,7 @@ impl IndexerBot {
                     inserter
                         .push(utils::indradb::BulkInsertItem::VertexProperty(
                             *uuid,
-                            self.room_topic_type,
+                            self.identifiers.room_topic_type,
                             serde_json::Value::String(room_topic.to_string()).into(),
                         ))
                         .await;
@@ -233,7 +266,7 @@ impl IndexerBot {
                 inserter
                     .push(utils::indradb::BulkInsertItem::VertexProperty(
                         *uuid,
-                        self.event_id_type,
+                        self.identifiers.event_id_type,
                         serde_json::Value::String(event_id.to_string()).into(),
                     ))
                     .await;
