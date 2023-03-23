@@ -59,7 +59,7 @@ impl BulkInserter {
             self.requests.send(self.buf).await.unwrap();
         }
         self.requests.close();
-        for worker in self.workers.into_iter() {
+        for worker in self.workers {
             worker.await.unwrap();
         }
         self.client.sync().await.unwrap();

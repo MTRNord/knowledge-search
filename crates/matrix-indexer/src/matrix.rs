@@ -24,6 +24,7 @@ struct Identifiers {
     text_message_event_type: utils::indradb::Identifier,
     notice_message_event_type: utils::indradb::Identifier,
     event_id_type: utils::indradb::Identifier,
+    event_in_room_type: utils::indradb::Identifier,
 }
 
 pub struct IndexerBot {
@@ -52,6 +53,7 @@ impl IndexerBot {
         let text_message_event_type = utils::indradb::Identifier::new("text_message_event")?;
         let notice_message_event_type = utils::indradb::Identifier::new("notice_message_event")?;
         let event_id_type = utils::indradb::Identifier::new("event_id")?;
+        let event_in_room_type = utils::indradb::Identifier::new("event_in_room")?;
         indexer_client.index_property(room_name_type).await?;
         indexer_client.index_property(room_topic_type).await?;
         indexer_client.index_property(event_id_type).await?;
@@ -78,6 +80,7 @@ impl IndexerBot {
                 text_message_event_type,
                 notice_message_event_type,
                 event_id_type,
+                event_in_room_type,
             },
         ))
     }
@@ -95,7 +98,10 @@ impl IndexerBot {
         let client_clone = client.clone();
         tokio::spawn(async move {
             let settings = SyncSettings::default();
-            client_clone.sync(settings).await.unwrap();
+            client_clone
+                .sync(settings)
+                .await
+                .expect("Failed to start matrix sync");
         });
 
         Ok(IndexerBot {
@@ -127,7 +133,10 @@ impl IndexerBot {
         let client_clone = client.clone();
         tokio::spawn(async move {
             let settings = SyncSettings::default();
-            client_clone.sync(settings).await.unwrap();
+            client_clone
+                .sync(settings)
+                .await
+                .expect("Failed to start matrix sync");
         });
 
         Ok(IndexerBot {
@@ -138,6 +147,8 @@ impl IndexerBot {
         })
     }
 
+    // FIXME:_split into multiple functions
+    #[allow(clippy::too_many_lines)]
     pub async fn start_processing(&mut self) {
         let mut inserter = BulkInserter::new(self.indexer_client.clone());
 
@@ -204,10 +215,11 @@ impl IndexerBot {
                                 }
                             }
                         }
-                        Ok(AnySyncTimelineEvent::MessageLike(_)) => {}
-                        Ok(AnySyncTimelineEvent::State(_)) => {}
+                        Ok(
+                            AnySyncTimelineEvent::MessageLike(_) | AnySyncTimelineEvent::State(_),
+                        ) => {}
                         Err(e) => {
-                            error!("Error deserializing event: {}", e)
+                            error!("Error deserializing event: {}", e);
                         }
                     }
                 }
@@ -276,6 +288,18 @@ impl IndexerBot {
                 {
                     inserter.push(event_property).await;
                 }
+            }
+
+            for (event_uuid, room_uuid) in &self.message_map.room_event_links {
+                inserter
+                    .push(utils::indradb::BulkInsertItem::Edge(
+                        utils::indradb::Edge::new(
+                            *event_uuid,
+                            self.identifiers.event_in_room_type,
+                            *room_uuid,
+                        ),
+                    ))
+                    .await;
             }
             inserter.sync().await.expect("Unable to sync indradb");
         }
