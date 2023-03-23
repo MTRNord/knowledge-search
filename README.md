@@ -1,3 +1,5 @@
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+
 # Knowledge Search
 
 Knowledge search is a graph database based recommendation search trying to be
@@ -11,5 +13,5 @@ focus on implementing things that I care about.
 ## Commit Guideline
 
 Please use [conventional commits](https://www.conventionalcommits.org). You can use the pre-commit script to ensure you
-do use conventional commits by running `pre-commit install --hook-type commit-msg`
+do use conventional commits by running `pre-commit install -t prepare-commit-msg -t commit-msg`
 after [installing pre-commit](https://pre-commit.com/#install).
