@@ -36,6 +36,7 @@ mod matrix;
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+    color_eyre::install()?;
 
     // Errors in the config will crash directly.
     let config = load();
