@@ -35,6 +35,13 @@ pub struct IndexerBot {
 }
 
 impl IndexerBot {
+    pub fn access_token(&self) -> Option<String> {
+        self.client.access_token()
+    }
+
+    pub fn device_id(&self) -> Option<String> {
+        self.client.device_id().map(ToString::to_string)
+    }
     async fn get_client(homeserver_url: String) -> Result<Client> {
         let mut client_builder = Client::builder().homeserver_url(homeserver_url);
         client_builder = client_builder.sled_store(Path::new("./matrix_data"), None)?;

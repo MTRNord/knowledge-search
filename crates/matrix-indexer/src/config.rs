@@ -1,4 +1,6 @@
-use kdl::KdlDocument;
+use std::io::Write;
+
+use kdl::{KdlDocument, KdlEntry, KdlIdentifier, KdlNode};
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
@@ -194,4 +196,56 @@ pub fn load() -> Config {
             std::process::exit(1);
         }
     }
+}
+
+pub fn write_access_token(access_token: String, device_id: String) -> color_eyre::Result<()> {
+    let source = std::fs::read_to_string("config.kdl")
+        .expect("Unable to open config.kdl file. Is it present?");
+    let config = parse(&source);
+    match config {
+        Ok(mut config) => {
+            let matrix = config.get_mut("matrix");
+            if let Some(matrix) = matrix {
+                if let Some(matrix_children) = matrix.children_mut() {
+                    let matrix_nodes = matrix_children.nodes_mut();
+                    let access_token_identifier = KdlIdentifier::from("access_token");
+                    let device_id_identifier = KdlIdentifier::from("device_id");
+
+                    let mut access_token_node = KdlNode::new(access_token_identifier);
+                    let access_token_entry = KdlEntry::new(access_token);
+                    access_token_node.entries_mut().push(access_token_entry);
+
+                    let mut device_id_node = KdlNode::new(device_id_identifier);
+                    let device_id_entry = KdlEntry::new(device_id);
+                    device_id_node.entries_mut().push(device_id_entry);
+
+                    matrix_nodes.push(access_token_node);
+                    matrix_nodes.push(device_id_node);
+                    matrix_nodes.retain(|node| {
+                        node.name().value() != "username" && node.name().value() != "password"
+                    });
+
+                    matrix_nodes.sort_by(sort_by_name);
+                }
+                matrix.fmt();
+            }
+
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open("config.kdl")?;
+
+            file.write_all(config.to_string().as_bytes())?;
+            file.flush()?;
+            Ok(())
+        }
+        Err(error) => {
+            let err = format!("{error:?}");
+            Err(color_eyre::eyre::eyre!("{}", err))
+        }
+    }
+}
+
+fn sort_by_name(x: &KdlNode, y: &KdlNode) -> std::cmp::Ordering {
+    x.name().value().cmp(y.name().value())
 }

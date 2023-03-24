@@ -24,9 +24,9 @@
 // I am lazy. Dont blame me!
 #![allow(missing_docs)]
 
-use color_eyre::Result;
+use color_eyre::{eyre::bail, Result};
 
-use config::load;
+use config::{load, write_access_token};
 use matrix::IndexerBot;
 
 mod config;
@@ -41,15 +41,23 @@ async fn main() -> Result<()> {
     let config = load();
 
     // TODO: config which rewrites itself to have the data after login
+    #[allow(clippy::unwrap_used)]
     let mut bot = match config.auth_data {
         config::AuthData::UsernamePassword(mxid, password) => {
-            IndexerBot::new(
+            let bot = IndexerBot::new(
                 config.homeserver_url,
                 mxid,
                 password,
                 config.indradb_endpoint,
             )
-            .await?
+            .await?;
+            let access_token = bot.access_token();
+            let device_id = bot.device_id();
+            if access_token.is_none() || device_id.is_none() {
+                bail!("Login to matrix must have failed. We got no access_token or device_id!");
+            }
+            write_access_token(access_token.unwrap(), device_id.unwrap())?;
+            bot
         }
         config::AuthData::AccessToken(mxid, access_token, device_id) => {
             IndexerBot::relogin(
