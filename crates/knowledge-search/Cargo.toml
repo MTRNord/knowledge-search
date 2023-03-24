@@ -6,6 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = { version = "0.6.12", features = ["macros"] }
 clap = { version = "4.1.11", features = ["derive"] }
+color-eyre = "0.6.2"
+tera = "1.18.1"
+thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["full"] }
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
 utils = { version = "0.0.0", path = "../utils" }
