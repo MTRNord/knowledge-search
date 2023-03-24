@@ -26,25 +26,42 @@
 
 use color_eyre::Result;
 
-use clap::Parser;
+use config::load;
 use matrix::IndexerBot;
 
+mod config;
 mod indradb_utils;
 mod matrix;
 
-/// An indexer for the knowledge search that indexes matrix
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    color_eyre::install()?;
     tracing_subscriber::fmt::init();
-    let _args = Args::parse();
+
+    // Errors in the config will crash directly.
+    let config = load();
 
     // TODO: config which rewrites itself to have the data after login
-    let mut bot = IndexerBot::new(String::new(), String::new(), String::new()).await?;
+    let mut bot = match config.auth_data {
+        config::AuthData::UsernamePassword(mxid, password) => {
+            IndexerBot::new(
+                config.homeserver_url,
+                mxid,
+                password,
+                config.indradb_endpoint,
+            )
+            .await?
+        }
+        config::AuthData::AccessToken(mxid, access_token, device_id) => {
+            IndexerBot::relogin(
+                config.homeserver_url,
+                mxid,
+                access_token,
+                device_id,
+                config.indradb_endpoint,
+            )
+            .await?
+        }
+    };
     bot.start_processing().await?;
 
     Ok(())

@@ -1,0 +1,12 @@
+// Settings related to the matrix bot
+matrix {
+    // The URL of the homeserver. 
+    homeserver_url "https://matrixsomewhere.com"
+    // You can either use username and password or a token.
+    // The config will be automatically rewritten after first login.
+    username "@mxid:matrix.example"
+    password "abcdef"
+}
+
+// Usually you can just keep this as is
+indradb_address "grpc://127.0.0.1:27615"

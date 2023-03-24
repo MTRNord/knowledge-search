@@ -42,9 +42,11 @@ impl IndexerBot {
         Ok(client_builder.build().await?)
     }
 
-    async fn get_indexer_client() -> Result<(utils::indradb_proto::Client, Identifiers)> {
+    async fn get_indexer_client(
+        endpoint: String,
+    ) -> Result<(utils::indradb_proto::Client, Identifiers)> {
         info!("Trying to connect to indradb");
-        let mut indexer_client = utils::get_client_retrying().await?;
+        let mut indexer_client = utils::get_client_retrying(endpoint).await?;
         indexer_client.ping().await?;
         let room_type = utils::indradb::Identifier::new("matrix_room")?;
         let room_id_type = utils::indradb::Identifier::new("room_id")?;
@@ -85,7 +87,12 @@ impl IndexerBot {
         ))
     }
 
-    pub async fn new(homeserver_url: String, user_id: String, password: String) -> Result<Self> {
+    pub async fn new(
+        homeserver_url: String,
+        user_id: String,
+        password: String,
+        indra_endpoint: String,
+    ) -> Result<Self> {
         let client = IndexerBot::get_client(homeserver_url).await?;
         client
             .login_username(&user_id, &password)
@@ -93,7 +100,7 @@ impl IndexerBot {
             .send()
             .await?;
 
-        let (indexer_client, identifiers) = IndexerBot::get_indexer_client().await?;
+        let (indexer_client, identifiers) = IndexerBot::get_indexer_client(indra_endpoint).await?;
 
         let client_clone = client.clone();
         tokio::spawn(async move {
@@ -117,6 +124,7 @@ impl IndexerBot {
         user_id: String,
         access_token: String,
         device_id: String,
+        indra_endpoint: String,
     ) -> Result<Self> {
         let client = IndexerBot::get_client(homeserver_url).await?;
         client
@@ -128,7 +136,7 @@ impl IndexerBot {
             })
             .await?;
 
-        let (indexer_client, identifiers) = IndexerBot::get_indexer_client().await?;
+        let (indexer_client, identifiers) = IndexerBot::get_indexer_client(indra_endpoint).await?;
 
         let client_clone = client.clone();
         tokio::spawn(async move {
