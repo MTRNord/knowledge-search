@@ -230,6 +230,7 @@ impl IndexerBot {
                                 }
                             }
                         }
+                        // TODO: index space hierachy
                         Ok(
                             AnySyncTimelineEvent::MessageLike(_) | AnySyncTimelineEvent::State(_),
                         ) => {}
