@@ -24,6 +24,8 @@
 // I am lazy. Dont blame me!
 #![allow(missing_docs)]
 
+use std::collections::BTreeSet;
+
 use color_eyre::{eyre::bail, Result};
 
 use config::{load, write_access_token};
@@ -41,7 +43,17 @@ async fn main() -> Result<()> {
     // Errors in the config will crash directly.
     let config = load();
 
-    // TODO: config which rewrites itself to have the data after login
+    // Make sure to update identifier list. These are ONLY the ones we can query aka they are indexed
+    let mut identifiers = BTreeSet::from([
+        String::from("text_message_body"),
+        String::from("text_message_formatted_body"),
+        String::from("room_id"),
+        String::from("room_name"),
+        String::from("room_topic"),
+        String::from("event_id"),
+    ]);
+    utils::add_identifiers(&mut identifiers)?;
+
     #[allow(clippy::unwrap_used)]
     let mut bot = match config.auth_data {
         config::AuthData::UsernamePassword(mxid, password) => {

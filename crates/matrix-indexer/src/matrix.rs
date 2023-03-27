@@ -63,14 +63,12 @@ impl IndexerBot {
         let notice_message_event_type = utils::indradb::Identifier::new("notice_message_event")?;
         let event_id_type = utils::indradb::Identifier::new("event_id")?;
         let event_in_room_type = utils::indradb::Identifier::new("event_in_room")?;
+        indexer_client.index_property(room_id_type).await?;
         indexer_client.index_property(room_name_type).await?;
         indexer_client.index_property(room_topic_type).await?;
         indexer_client.index_property(event_id_type).await?;
         indexer_client
             .index_property(utils::indradb::Identifier::new("text_message_body")?)
-            .await?;
-        indexer_client
-            .index_property(utils::indradb::Identifier::new("text_message_format")?)
             .await?;
         indexer_client
             .index_property(utils::indradb::Identifier::new(

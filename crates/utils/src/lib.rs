@@ -24,8 +24,11 @@
 // I am lazy. Dont blame me!
 #![allow(missing_docs)]
 
+use std::{collections::BTreeSet, fs::OpenOptions, path::PathBuf};
+
 pub use indradb;
 pub use indradb_proto;
+use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 
 pub async fn get_client(
@@ -57,4 +60,40 @@ pub async fn get_client_retrying(
     }
 
     Err(last_err.expect("We didnt get an error even though connection failed"))
+}
+
+fn get_identifier_config() -> PathBuf {
+    let config_path = dirs::config_dir();
+    if let Some(config_path) = config_path {
+        config_path.join("knowledge-search/identifier.json")
+    } else {
+        panic!("System not supported.")
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct IdentifierConfig {
+    identifiers: BTreeSet<String>,
+}
+
+pub fn get_identifier() -> Result<BTreeSet<String>, std::io::Error> {
+    let identifier_file = OpenOptions::new()
+        .read(true)
+        .create(true)
+        .open(get_identifier_config())?;
+    let identifier_config: IdentifierConfig = serde_json::from_reader(identifier_file)?;
+    Ok(identifier_config.identifiers)
+}
+
+pub fn add_identifiers(identifiers: &mut BTreeSet<String>) -> Result<(), std::io::Error> {
+    let identifier_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(get_identifier_config())?;
+    let mut identifier_config: IdentifierConfig = serde_json::from_reader(&identifier_file)?;
+    identifier_config.identifiers.append(identifiers);
+    serde_json::to_writer_pretty(identifier_file, &identifier_config)?;
+
+    Ok(())
 }
