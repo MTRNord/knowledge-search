@@ -83,7 +83,7 @@ impl PageRank {
         let mut rank_vec: Vec<(String, f32)> =
             self.ranks.iter().map(|(k, v)| (k.clone(), *v)).collect();
 
-        rank_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        rank_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("Invalid comparison"));
 
         rank_vec
             .iter()
