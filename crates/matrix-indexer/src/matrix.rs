@@ -165,8 +165,11 @@ impl IndexerBot {
     pub async fn start_processing(&mut self) -> Result<()> {
         let mut inserter = BulkInserter::new(self.indexer_client.clone());
 
+        info!("Got bulk inserter. Starting sync");
+
         let mut sync_stream = Box::pin(self.client.sync_stream(SyncSettings::default()).await);
 
+        info!("Sync obtained. Starting to process sync stream");
         while let Some(Ok(response)) = sync_stream.next().await {
             for (ref room_id, room) in response.rooms.join {
                 for e in &room.timeline.events {
@@ -315,7 +318,7 @@ impl IndexerBot {
                     ))
                     .await?;
             }
-            inserter.sync().await?;
+            inserter.flush().await?;
         }
         Ok(())
     }

@@ -221,9 +221,7 @@ pub fn write_access_token(access_token: String, device_id: String) -> color_eyre
 
                     matrix_nodes.push(access_token_node);
                     matrix_nodes.push(device_id_node);
-                    matrix_nodes.retain(|node| {
-                        node.name().value() != "username" && node.name().value() != "password"
-                    });
+                    matrix_nodes.retain(|node| node.name().value() != "password");
 
                     matrix_nodes.sort_by(sort_by_name);
                 }

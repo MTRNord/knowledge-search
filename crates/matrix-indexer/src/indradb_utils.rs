@@ -55,15 +55,15 @@ impl BulkInserter {
         Ok(())
     }
 
-    pub async fn flush(mut self) -> Result<()> {
+    pub async fn flush(&mut self) -> Result<()> {
         if !self.buf.is_empty() {
-            self.requests.send(self.buf).await?;
+            self.requests.send(self.buf.clone()).await?;
         }
-        self.requests.close();
-        for worker in self.workers {
-            worker.await??;
-        }
-        self.client.sync().await?;
+        //self.requests.close();
+        // for worker in &self.workers {
+        //     worker.await??;
+        // }
+        self.sync().await?;
         Ok(())
     }
 

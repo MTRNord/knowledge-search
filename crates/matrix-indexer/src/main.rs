@@ -30,6 +30,7 @@ use color_eyre::{eyre::bail, Result};
 
 use config::{load, write_access_token};
 use matrix::IndexerBot;
+use tracing::info;
 
 mod config;
 mod indradb_utils;
@@ -37,6 +38,7 @@ mod matrix;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    std::env::set_var("RUST_LOG", "matrix_sdk=info,matrix-indexer=debug");
     tracing_subscriber::fmt::init();
     color_eyre::install()?;
 
@@ -83,6 +85,7 @@ async fn main() -> Result<()> {
             .await?
         }
     };
+    info!("Starting to process");
     bot.start_processing().await?;
 
     Ok(())

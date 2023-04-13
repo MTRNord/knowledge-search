@@ -20,16 +20,17 @@
     clippy::panic_in_result_fn,
     clippy::clone_on_ref_ptr
 )]
-#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::missing_panics_doc, clippy::panic_in_result_fn)]
 // I am lazy. Dont blame me!
 #![allow(missing_docs)]
 
-use std::{collections::BTreeSet, fs::OpenOptions, path::PathBuf};
+use std::{collections::BTreeSet, fs::OpenOptions, io::Read, path::PathBuf};
 
 pub use indradb;
 pub use indradb_proto;
 use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
+use tracing::instrument;
 
 pub async fn get_client(
     endpoint: String,
@@ -85,15 +86,34 @@ pub fn get_identifier() -> Result<BTreeSet<String>, std::io::Error> {
     Ok(identifier_config.identifiers)
 }
 
+#[instrument]
 pub fn add_identifiers(identifiers: &mut BTreeSet<String>) -> Result<(), std::io::Error> {
-    let identifier_file = OpenOptions::new()
+    let config_path = get_identifier_config();
+    let prefix = config_path.parent().expect("No parent folder found");
+    std::fs::create_dir_all(prefix)?;
+
+    let mut identifier_file = OpenOptions::new()
         .read(true)
         .write(true)
+        .truncate(true)
         .create(true)
-        .open(get_identifier_config())?;
-    let mut identifier_config: IdentifierConfig = serde_json::from_reader(&identifier_file)?;
+        .open(config_path)?;
+    let mut s = String::new();
+    identifier_file
+        .read_to_string(&mut s)
+        .expect("Unable to read file");
+
+    let mut identifier_config: IdentifierConfig;
+    if s.is_empty() {
+        identifier_config = IdentifierConfig {
+            identifiers: BTreeSet::new(),
+        };
+    } else {
+        identifier_config = serde_json::from_str(&s)?;
+    }
     identifier_config.identifiers.append(identifiers);
-    serde_json::to_writer_pretty(identifier_file, &identifier_config)?;
+    serde_json::to_writer_pretty(&identifier_file, &identifier_config)?;
+    identifier_file.sync_all()?;
 
     Ok(())
 }
